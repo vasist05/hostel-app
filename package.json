@@ -1,0 +1,18 @@
+{
+  "name": "hostel-management-app",
+  "version": "1.0.0",
+  "description": "StayEase Hostel Management System",
+  "scripts": {
+    "start": "npm --prefix backend start",
+    "dev": "npm --prefix backend run dev",
+    "test": "npm --prefix backend test"
+  },
+  "keywords": [
+    "hostel-management",
+    "express",
+    "react",
+    "sqlite"
+  ],
+  "author": "",
+  "license": "ISC"
+}
