@@ -1,13 +1,28 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const fs = require('fs');
+const path = require('path');
+
+// Load backend/.env with Node's built-in loader (no dotenv dependency required).
+// This has to happen before './database' is required, because database.js reads
+// DB_PATH at module load time.
+const envFile = path.resolve(__dirname, '.env');
+if (fs.existsSync(envFile)) {
+  try {
+    process.loadEnvFile(envFile);
+  } catch (err) {
+    console.warn('Could not load .env file:', err.message);
+  }
+}
+
 const { initDatabase, runAsync, getAsync, allAsync } = require('./database');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Middlewares
-app.use(cors());
+app.use(cors({ origin: process.env.CORS_ORIGIN || '*' }));
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '10mb' }));
 
@@ -273,13 +288,24 @@ app.put('/api/rooms/:id', async (req, res) => {
       roomNumber, room_number, floor, type, category, ac,
       pricePerMonth, price_per_month, deposit, totalBeds, total_beds,
       availableBeds, available_beds, amenities, image, image_url
-    } = req.body;
+    } = req.body || {};
 
-    const rNumber = roomNumber || room_number;
+    // Prefer the camelCase field, then the snake_case alias. Deliberately not
+    // `a || b`: a legitimate 0 (e.g. availableBeds: 0) is falsy and would fall
+    // through to the alias, so the COALESCE below would silently keep the old value.
+    const pick = (primary, alias) => (primary !== undefined ? primary : alias);
+
+    const rNumber = pick(roomNumber, room_number);
     const rAc = ac !== undefined ? (ac ? 1 : 0) : undefined;
-    const rAmenities = typeof amenities === 'object' ? JSON.stringify(amenities) : amenities;
+    const rPrice = pick(pricePerMonth, price_per_month);
+    const rTotal = pick(totalBeds, total_beds);
+    const rAvail = pick(availableBeds, available_beds);
+    const rImage = pick(image, image_url);
+    const rAmenities = amenities === undefined
+      ? undefined
+      : (typeof amenities === 'object' && amenities !== null ? JSON.stringify(amenities) : amenities);
 
-    await runAsync(
+    const result = await runAsync(
       `UPDATE rooms SET
         room_number = COALESCE(?, room_number),
         floor = COALESCE(?, floor),
@@ -295,13 +321,16 @@ app.put('/api/rooms/:id', async (req, res) => {
        WHERE id = ?`,
       [
         rNumber, floor, type, category, rAc,
-        pricePerMonth || price_per_month, deposit,
-        totalBeds || total_beds, availableBeds || available_beds,
-        rAmenities, image || image_url, req.params.id
+        rPrice, deposit, rTotal, rAvail,
+        rAmenities, rImage, req.params.id
       ]
     );
 
-    res.json({ message: 'Room updated successfully' });
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    res.json({ message: 'Room updated successfully', changes: result.changes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -344,24 +373,41 @@ app.post('/api/rooms/:roomId/beds', async (req, res) => {
 
 app.put('/api/beds/:id', async (req, res) => {
   try {
-    const { status, tenant, tenant_name, phone, tenant_phone, joinDate, join_date, paymentStatus, payment_status } = req.body;
-    const tName = tenant !== undefined ? tenant : tenant_name;
-    const tPhone = phone !== undefined ? phone : tenant_phone;
-    const jDate = joinDate !== undefined ? joinDate : join_date;
-    const pStatus = paymentStatus !== undefined ? paymentStatus : payment_status;
+    const { status, tenant, tenant_name, phone, tenant_phone, joinDate, join_date, paymentStatus, payment_status } = req.body || {};
 
-    await runAsync(
-      `UPDATE beds SET
-        status = COALESCE(?, status),
-        tenant_name = ?,
-        tenant_phone = ?,
-        join_date = ?,
-        payment_status = ?
-       WHERE id = ? OR bed_id = ?`,
-      [status, tName, tPhone, jDate, pStatus, req.params.id, req.params.id]
+    // Only build assignments for the columns the caller actually sent. Omitting a
+    // field must leave it untouched: a partial `{ status }` update used to bind
+    // NULL to tenant_name/tenant_phone/join_date/payment_status and wipe the
+    // resident's record. Passing an explicit null still clears a column.
+    const assignments = [];
+    const params = [];
+    const assign = (column, value) => {
+      if (value === undefined) return;
+      assignments.push(`${column} = ?`);
+      params.push(value);
+    };
+
+    assign('status', status);
+    assign('tenant_name', tenant !== undefined ? tenant : tenant_name);
+    assign('tenant_phone', phone !== undefined ? phone : tenant_phone);
+    assign('join_date', joinDate !== undefined ? joinDate : join_date);
+    assign('payment_status', paymentStatus !== undefined ? paymentStatus : payment_status);
+
+    if (assignments.length === 0) {
+      return res.status(400).json({ error: 'No updatable bed fields provided' });
+    }
+
+    params.push(req.params.id, req.params.id);
+    const result = await runAsync(
+      `UPDATE beds SET ${assignments.join(', ')} WHERE id = ? OR bed_id = ?`,
+      params
     );
 
-    res.json({ message: 'Bed updated successfully' });
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Bed not found' });
+    }
+
+    res.json({ message: 'Bed updated successfully', changes: result.changes });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -754,9 +800,36 @@ app.get('/api/stats', async (req, res) => {
 // ----------------------------------------------------
 // Frontend Static Files
 // ----------------------------------------------------
-const path = require('path');
 const frontendDir = path.resolve(__dirname, '..');
-app.use(express.static(frontendDir));
+
+// The frontend lives in the repository root, so a plain express.static(frontendDir)
+// also publishes everything sitting next to it - including backend/hostel.db
+// (tenant names and phone numbers) and the backend sources. Only files that live
+// directly in the frontend directory are exposed here.
+function isFrontendAsset(reqPath) {
+  if (reqPath === '/' || reqPath === '') return true;
+
+  let decoded;
+  try {
+    decoded = decodeURIComponent(reqPath);
+  } catch (err) {
+    return false;
+  }
+
+  if (decoded.includes('\0')) return false;
+
+  const resolved = path.resolve(frontendDir, '.' + decoded);
+  return path.dirname(resolved) === frontendDir;
+}
+
+app.use((req, res, next) => {
+  if (!isFrontendAsset(req.path)) {
+    return res.status(404).json({ error: `Route ${req.method} ${req.originalUrl} not found` });
+  }
+  next();
+});
+
+app.use(express.static(frontendDir, { dotfiles: 'ignore' }));
 
 app.get('/', (req, res) => {
   res.sendFile(path.join(frontendDir, 'index.html'));
@@ -765,10 +838,10 @@ app.get('/', (req, res) => {
 // ----------------------------------------------------
 // 404 & Error Handling
 // ----------------------------------------------------
+// Always answer with JSON. The previous version served index.html for any
+// client that accepted text/html - including fetch()'s default `Accept: */*` -
+// so a typo'd /api/* URL looked like a successful 200 response.
 app.use((req, res) => {
-  if (req.accepts('html')) {
-    return res.sendFile(path.join(frontendDir, 'index.html'));
-  }
   res.status(404).json({ error: `Route ${req.method} ${req.originalUrl} not found` });
 });
 
@@ -781,11 +854,14 @@ app.use((err, req, res, next) => {
 async function startServer() {
   try {
     await initDatabase();
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
+      // Read the bound port back from the server: PORT=0 asks the OS for a free
+      // port, in which case the configured value is not the one actually used.
+      const { port } = server.address();
       console.log(`========================================`);
       console.log(` StayEase Hostel Management API Running `);
-      console.log(` Server URL: http://localhost:${PORT}   `);
-      console.log(` Health Check: http://localhost:${PORT}/api/health `);
+      console.log(` Server URL: http://localhost:${port}   `);
+      console.log(` Health Check: http://localhost:${port}/api/health `);
       console.log(`========================================`);
     });
   } catch (err) {

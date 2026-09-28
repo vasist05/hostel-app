@@ -1,0 +1,5 @@
+# Installed dependencies.
+# (backend/node_modules is currently committed to git; this keeps newly
+# installed trees, such as the root one used for the frontend build, out of it.)
+node_modules/
+.freebuff/

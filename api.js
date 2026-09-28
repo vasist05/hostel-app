@@ -8,12 +8,14 @@ const API_BASE_URL = window.STAYEASE_API_URL || 'http://localhost:5000/api';
 async function apiRequest(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
   try {
+    // `options` must be spread first: spreading it last would replace the merged
+    // headers object with options.headers, silently dropping Content-Type.
     const res = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
-      },
-      ...options
+      }
     });
 
     if (!res.ok) {

@@ -24,13 +24,20 @@ hostel-management-app/
 │   ├── .env.example         # Environment template
 │   ├── database.js          # SQLite connection, schema definition & seed data
 │   ├── server.js            # Express API server & routes
-│   ├── test-api.js          # Automated 30-assertion API test suite
+│   ├── test-api.js          # Automated 43-assertion API test suite
 │   ├── package.json         # Dependencies & npm scripts
 │   └── hostel.db            # SQLite database file (created automatically)
+├── scripts/
+│   ├── build.js             # Compiles app.js (JSX) into app.compiled.js
+│   └── dev.js               # Runs the bundle watcher + backend dev server together
 ├── api.js                   # Frontend API client library
+├── app.js                   # Main React frontend source (edit this one)
+├── app.compiled.js          # Generated browser bundle (do not edit by hand)
+├── babel.config.json        # Babel config used by the frontend build
 ├── backend-demo.html        # Interactive API test & control center
 ├── index.html               # Main single-page web app
-├── app.js                   # Main React frontend
+├── package.json             # Frontend build scripts & dev dependency
+├── .gitignore               # Ignores installed node_modules
 └── BACKEND_README.md        # This documentation
 ```
 
@@ -39,10 +46,10 @@ hostel-management-app/
 ## Quick Start
 
 ### 1. Install Dependencies
-Open a terminal in the `backend` directory:
+Install the backend, plus the toolchain used to build the frontend:
 ```bash
-cd backend
-npm install
+npm install                 # root: Babel toolchain for the frontend build
+npm --prefix backend install
 ```
 
 ### 2. Configure Environment (Optional)
@@ -68,7 +75,26 @@ With the server running in another terminal, run:
 ```bash
 npm test
 ```
-All 30 automated integration test assertions will execute and report status.
+All 43 automated integration test assertions will execute and report status.
+
+---
+
+## Frontend Build
+
+`index.html` loads **`app.compiled.js`**, never `app.js` directly. `app.compiled.js` is generated output: edit `app.js` and rebuild instead of editing the bundle by hand.
+
+| Script | What it does |
+|---|---|
+| `npm run build` | Compile `app.js` → `app.compiled.js` once |
+| `npm run build:watch` | Compile, then rebuild whenever `app.js` or `babel.config.json` changes |
+| `npm run dev` | Run the bundle watcher **and** the backend dev server (nodemon) together |
+
+```bash
+npm install     # root: installs the Babel toolchain
+npm run dev     # bundle watcher + backend server, both auto-reloading
+```
+
+The build uses `@babel/preset-react` with the **classic** runtime, so the output is plain `React.createElement` calls that match the React 18 UMD globals loaded by `index.html`. A failed build leaves the previous bundle on disk and prints the error, so a syntax mistake in `app.js` cannot silently blank the page.
 
 ---
 

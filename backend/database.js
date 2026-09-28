@@ -1,7 +1,11 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
-const dbPath = process.env.DB_PATH || path.resolve(__dirname, 'hostel.db');
+// Resolve DB_PATH against the backend directory rather than the process cwd, so
+// a relative value (the default './hostel.db' in .env) always points at the same
+// file no matter which directory the server was launched from. Absolute paths
+// are returned unchanged.
+const dbPath = path.resolve(__dirname, process.env.DB_PATH || 'hostel.db');
 
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -197,15 +201,15 @@ async function seedDatabase() {
       `INSERT INTO hostels (id, name, address, contact_phone, contact_email, manager_name, total_floors, total_rooms, total_beds, washing_machines, rules)
        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        'StayEase Luxury Student & Executive Hostel',
-        'Plot 42, University Road, Sector 5, Knowledge City',
-        '+91 98999 11111',
+        'Relic Stays',
+        'beside sitara hotel, golden mile road , kokapet ,hyderabad',
+        '+91 89785 98292',
         'info@stayease.com',
         'Ramesh Sharma',
-        4,
-        7,
+        6,
+        40,
         120,
-        8,
+        3,
         JSON.stringify([
           'Gate closes strictly at 10:30 PM.',
           'Visitors permitted only in lounge between 9 AM to 7 PM.',

@@ -1,3 +1,8 @@
+/*
+ * AUTO-GENERATED FILE - DO NOT EDIT.
+ * Built from app.js by "npm run build" (see scripts/build.js).
+ * Manual changes here are overwritten on the next build; edit app.js instead.
+ */
 const {
   useState,
   useEffect,
@@ -10,7 +15,7 @@ const INITIAL_ROOMS = [{
   roomNumber: '101',
   floor: 1,
   type: 'three sharing',
-  category: 'triple',
+  category: 'Triple',
   ac: true,
   pricePerMonth: 12000,
   deposit: 15000,
@@ -494,6 +499,9 @@ function App() {
   useEffect(() => {
     localStorage.setItem('stayease_visitors', JSON.stringify(visitors));
   }, [visitors]);
+  useEffect(() => {
+    localStorage.setItem('stayease_notices', JSON.stringify(notices));
+  }, [notices]);
 
   // Dark mode class toggle
   useEffect(() => {
@@ -717,7 +725,9 @@ function PublicCustomerView({
   const filteredRooms = useMemo(() => {
     return rooms.filter(r => {
       if (selectedFloor !== 'ALL' && r.floor !== Number(selectedFloor)) return false;
-      if (selectedCategory !== 'ALL' && r.category !== selectedCategory) return false;
+      // Compare case-insensitively: categories arrive as either 'Triple' or
+      // 'triple' depending on whether they came from the mock seed or the API.
+      if (selectedCategory !== 'ALL' && String(r.category).toLowerCase() !== selectedCategory.toLowerCase()) return false;
       if (acOnly && !r.ac) return false;
       return true;
     });
@@ -1950,7 +1960,7 @@ function ManagerDashboardView({
   // Stats calculation
   const totalBeds = useMemo(() => rooms.reduce((acc, r) => acc + r.totalBeds, 0), [rooms]);
   const occupiedBeds = useMemo(() => rooms.reduce((acc, r) => acc + (r.totalBeds - r.availableBeds), 0), [rooms]);
-  const occupancyPercentage = Math.round(occupiedBeds / totalBeds * 100);
+  const occupancyPercentage = totalBeds > 0 ? Math.round(occupiedBeds / totalBeds * 100) : 0;
 
   // New Expense form state
   const [newExpense, setNewExpense] = useState({

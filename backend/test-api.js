@@ -90,6 +90,67 @@ async function runTests() {
     });
     assert(updateBed.ok, 'PUT /api/beds/:id updates bed status & tenant');
 
+    // Regression: a partial update must not blank the fields the caller omitted.
+    // The handler used to assign tenant_name / tenant_phone / join_date /
+    // payment_status unconditionally, so sending `{ status }` alone wiped the
+    // resident's entire record.
+    const partialBed = await request('/api/beds/999-A', {
+      method: 'PUT',
+      body: JSON.stringify({ status: 'Available' })
+    });
+    assert(partialBed.ok, 'PUT /api/beds/:id accepts a partial (status-only) update');
+
+    const afterPartial = await request('/api/rooms/R999');
+    const partialRow = afterPartial.data.beds.find(b => b.id === '999-A');
+    assert(
+      partialRow && partialRow.tenant === 'Test Tenant',
+      'Partial bed update preserves the tenant name'
+    );
+    assert(
+      partialRow && partialRow.phone === '+91 99999 88888' && partialRow.paymentStatus === 'Paid',
+      'Partial bed update preserves phone, join date and payment status'
+    );
+    assert(
+      partialRow && partialRow.status === 'Available',
+      'Partial bed update still applies the status that was sent'
+    );
+
+    // Regression: `availableBeds: 0` is falsy and used to be discarded by a `||`
+    // fallback, so COALESCE silently kept the previous value. R998 is left with
+    // no bed rows, which makes the rooms list fall back to the stored column.
+    await request('/api/rooms', {
+      method: 'POST',
+      body: JSON.stringify({
+        id: 'R998',
+        roomNumber: '998',
+        floor: 9,
+        type: 'Zero Vacancy Test Room',
+        category: 'Single',
+        ac: true,
+        pricePerMonth: 9000,
+        deposit: 9000,
+        totalBeds: 1,
+        availableBeds: 1,
+        beds: [{ id: '998-A', status: 'Occupied' }]
+      })
+    });
+    await request('/api/beds/998-A', { method: 'DELETE' });
+
+    const zeroPut = await request('/api/rooms/R998', {
+      method: 'PUT',
+      body: JSON.stringify({ availableBeds: 0 })
+    });
+    assert(zeroPut.ok, 'PUT /api/rooms/:id accepts availableBeds: 0');
+
+    const roomsAfterZero = await request('/api/rooms');
+    const zeroRoom = roomsAfterZero.data.find(r => r.id === 'R998');
+    assert(
+      zeroRoom && zeroRoom.availableBeds === 0,
+      'availableBeds: 0 is persisted instead of looking like "not provided"'
+    );
+
+    await request('/api/rooms/R998', { method: 'DELETE' });
+
     const deleteRoom = await request('/api/rooms/R999', { method: 'DELETE' });
     assert(deleteRoom.ok, 'DELETE /api/rooms/R999 cleans up test room');
 
@@ -236,6 +297,22 @@ async function runTests() {
       stats.data.occupancyRate !== undefined,
       `GET /api/stats returns analytics (Rooms: ${stats.data?.totalRooms}, Beds: ${stats.data?.totalBeds}, Occupancy: ${stats.data?.occupancyRate}%)`
     );
+
+    // 12. Static exposure & routing guards
+    console.log('\n12. Static File Exposure & Routing Guards:');
+    for (const guardedPath of ['/backend/hostel.db', '/backend/database.js', '/backend/server.js', '/backend/.env']) {
+      const guarded = await request(guardedPath, { headers: { Accept: 'text/html' } });
+      assert(guarded.status === 404, `GET ${guardedPath} is not served (got ${guarded.status})`);
+    }
+
+    const unknownRoute = await request('/api/definitely-not-a-route');
+    assert(unknownRoute.status === 404, 'Unknown /api/* route returns 404 instead of a 200 HTML page');
+
+    const frontendPage = await request('/');
+    assert(frontendPage.status === 200, 'GET / still serves the frontend after the guard');
+
+    const appBundle = await request('/app.compiled.js');
+    assert(appBundle.status === 200, 'GET /app.compiled.js is still served');
 
     console.log(`\n==============================================`);
     console.log(`Summary: ${passed} Passed, ${failed} Failed`);
