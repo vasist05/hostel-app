@@ -1,5 +1,20 @@
-# Installed dependencies.
-# (backend/node_modules is currently committed to git; this keeps newly
-# installed trees, such as the root one used for the frontend build, out of it.)
+# Dependencies
 node_modules/
+backend/node_modules/
+
+# SQLite database (runtime data — don't version control)
+backend/hostel.db
+
+# Environment variables (contains secrets)
+backend/.env
+
+# Stitch tool internals
 .freebuff/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/

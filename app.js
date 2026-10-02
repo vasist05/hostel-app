@@ -7,7 +7,7 @@ const INITIAL_ROOMS = [
     roomNumber: '101',
     floor: 1,
     type: 'three sharing',
-    category: 'Triple',
+    category: 'triple',
     ac: true,
     pricePerMonth: 12000,
     deposit: 15000,
@@ -183,6 +183,81 @@ const INITIAL_VISITORS = [
   { id: 'V-502', visitorName: 'Anil Singh', hostTenant: 'Vikram Singh', room: '103', relation: 'Brother', entryTime: '2026-08-13 04:00 PM', exitTime: 'Active inside', status: 'Checked In' }
 ];
 
+// --- INITIAL HOSTEL PROFILE DATA ---
+const INITIAL_HOSTEL = {
+  name: 'StayEase Luxury Student & Executive Hostel',
+  tagline: 'Modern, Safe & Comfortable Hostel Living',
+  address: 'Plot 42, University Road, Sector 5, Knowledge City',
+  contactPhone: '+91 98999 11111',
+  contactEmail: 'info@stayease.com',
+  managerName: 'Ramesh Sharma',
+  emergencyPhone: '+91 98999 33333',
+  totalFloors: 4,
+  washingMachines: 8,
+  rules: [
+    'Gate closes strictly at 10:30 PM.',
+    'Visitors permitted only in lounge between 9 AM to 7 PM.',
+    'Silent hours from 11:00 PM to 6:00 AM.',
+    'No smoking, alcohol, or contraband inside premises.',
+    'Monthly fees payable by 5th of each calendar month.'
+  ]
+};
+
+// --- PRESET HOSTEL TEMPLATES (ONE-CLICK SWITCHER) ---
+const HOSTEL_TEMPLATES = {
+  COLLEGE: {
+    name: 'GreenValley University Campus Hostel',
+    tagline: 'Affordable, secure student community with 24/7 library & sports',
+    address: 'Near Tech University North Gate, Academic Zone',
+    contactPhone: '+91 98111 22233',
+    contactEmail: 'warden@greenvalleyhostel.in',
+    managerName: 'Prof. Arvind Menon',
+    emergencyPhone: '+91 98111 99999',
+    totalFloors: 4,
+    washingMachines: 6,
+    rules: [
+      'Strict curfew at 9:30 PM (Biometric sign-in required).',
+      'Study quiet hours strictly enforced from 10 PM to 6 AM.',
+      'Visitors allowed only in common study hall till 6 PM.',
+      'Ragging or unruly behavior leads to immediate expulsion.'
+    ]
+  },
+  PROFESSIONAL: {
+    name: 'UrbanNest Executive Co-Living & PG',
+    tagline: 'Work-ready suites with ergonomic desks, 1 Gbps WiFi & cleaning',
+    address: 'Opposite Cyber Towers, Phase 2, IT Hub',
+    contactPhone: '+91 98222 44455',
+    contactEmail: 'stay@urbannestcoliving.com',
+    managerName: 'Vikramaditya Rao',
+    emergencyPhone: '+91 98222 00000',
+    totalFloors: 5,
+    washingMachines: 10,
+    rules: [
+      '24/7 keycard access with zero curfew for working professionals.',
+      'Guests permitted until 10 PM in individual rooms.',
+      'Workspaces and phone booths to be kept clean after meetings.',
+      'Quiet hours in residential wings after 11:30 PM.'
+    ]
+  },
+  WOMEN: {
+    name: 'SafeHaven Women Residence & PG',
+    tagline: 'High-security women-only premium residence with full CCTV & warden desk',
+    address: 'Road 12, Green Park Enclave, Metro South',
+    contactPhone: '+91 98333 55566',
+    contactEmail: 'care@safehavenliving.org',
+    managerName: 'Mrs. Kalyani Sundaram',
+    emergencyPhone: '+91 98333 91111',
+    totalFloors: 4,
+    washingMachines: 8,
+    rules: [
+      'Security desk check-in before 10:00 PM (Late pass via portal).',
+      'Male visitors strictly restricted to Reception Lobby only.',
+      '24/7 CCTV surveillance & biometric attendance in effect.',
+      'In-house resident doctor available on call.'
+    ]
+  }
+};
+
 // --- TRANSLATION DICTIONARY ---
 const TRANSLATIONS = {
   en: {
@@ -241,7 +316,14 @@ const TRANSLATIONS = {
 // --- MAIN REACT APPLICATION APP COMPONENT ---
 function App() {
   // State
-  const [role, setRole] = useState('PUBLIC_CUSTOMER'); // PUBLIC_CUSTOMER, NEW_JOINER, TENANT, MANAGER
+  const [role, setRole] = useState(() => {
+    const hint = localStorage.getItem('stayease_role_hint');
+    if (hint) {
+      localStorage.removeItem('stayease_role_hint');
+      return hint;
+    }
+    return (window.location.hash === '#settings' || window.location.hash === '#manager') ? 'MANAGER' : 'PUBLIC_CUSTOMER';
+  });
   const [lang, setLang] = useState('en');
   const [darkMode, setDarkMode] = useState(false);
   const [toast, setToast] = useState(null);
@@ -269,6 +351,10 @@ function App() {
     return saved ? JSON.parse(saved) : INITIAL_VISITORS;
   });
   const [reviews, setReviews] = useState(INITIAL_REVIEWS);
+  const [hostelInfo, setHostelInfo] = useState(() => {
+    const saved = localStorage.getItem('stayease_hostel_info');
+    return saved ? JSON.parse(saved) : INITIAL_HOSTEL;
+  });
 
   // Sync with LocalStorage
   useEffect(() => {
@@ -284,8 +370,31 @@ function App() {
     localStorage.setItem('stayease_visitors', JSON.stringify(visitors));
   }, [visitors]);
   useEffect(() => {
-    localStorage.setItem('stayease_notices', JSON.stringify(notices));
-  }, [notices]);
+    localStorage.setItem('stayease_hostel_info', JSON.stringify(hostelInfo));
+  }, [hostelInfo]);
+
+  // Initial sync from backend API if online
+  useEffect(() => {
+    if (window.StayEaseApi) {
+      window.StayEaseApi.getHostel()
+        .then((data) => {
+          if (data && data.name) {
+            setHostelInfo((prev) => ({
+              ...prev,
+              name: data.name,
+              address: data.address || prev.address,
+              contactPhone: data.contact_phone || prev.contactPhone,
+              contactEmail: data.contact_email || prev.contactEmail,
+              managerName: data.manager_name || prev.managerName,
+              totalFloors: data.total_floors || prev.totalFloors,
+              washingMachines: data.washing_machines || prev.washingMachines,
+              rules: Array.isArray(data.rules) ? data.rules : (data.rules ? JSON.parse(data.rules) : prev.rules)
+            }));
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Dark mode class toggle
   useEffect(() => {
@@ -330,16 +439,16 @@ function App() {
             </div>
             <h3 className="text-xl font-bold text-center text-rose-600 dark:text-rose-400 mb-2">Emergency SOS Triggered</h3>
             <p className="text-sm text-slate-600 dark:text-slate-300 text-center mb-6">
-              Your location & room alert has been broadcasted immediately to Chief Warden Ramesh Sharma and the Security Desk.
+              Your location & room alert has been broadcasted immediately to Chief Warden {hostelInfo.managerName} and the Security Desk.
             </p>
             <div className="bg-rose-50 dark:bg-rose-950/40 p-4 rounded-xl mb-6 space-y-2 text-sm text-slate-700 dark:text-slate-200">
               <div className="flex justify-between font-semibold">
                 <span>Security Desk Hotline:</span>
-                <span className="text-rose-600">+91 98999 33333</span>
+                <span className="text-rose-600">{hostelInfo.emergencyPhone || '+91 98999 33333'}</span>
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Hostel Warden:</span>
-                <span className="text-rose-600">+91 98999 11111</span>
+                <span className="text-rose-600">{hostelInfo.contactPhone || '+91 98999 11111'}</span>
               </div>
               <div className="flex justify-between font-semibold">
                 <span>Medical Emergency:</span>
@@ -365,14 +474,14 @@ function App() {
 
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/30">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-indigo-500 flex items-center justify-center text-white shadow-md shadow-brand-500/30 shrink-0">
               <i data-lucide="building-2" className="w-6 h-6"></i>
             </div>
-            <div>
-              <span className="text-lg font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5">
-                StayEase <span className="text-xs px-2 py-0.5 rounded-full bg-brand-100 dark:bg-brand-950 text-brand-700 dark:text-brand-300 font-semibold border border-brand-200 dark:border-brand-800">Hostels</span>
+            <div className="min-w-0">
+              <span className="text-base sm:text-lg font-extrabold tracking-tight text-slate-900 dark:text-white flex items-center gap-1.5 truncate max-w-[240px] sm:max-w-xs md:max-w-md" title={hostelInfo.name}>
+                {hostelInfo.name}
               </span>
-              <p className="text-xs text-slate-500 dark:text-slate-400">Complete Management Suite</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[240px] sm:max-w-xs md:max-w-md">{hostelInfo.tagline || 'Complete Management Suite'}</p>
             </div>
           </div>
 
@@ -469,6 +578,7 @@ function App() {
             }}
             showToast={showToast}
             t={t}
+            hostelInfo={hostelInfo}
           />
         )}
 
@@ -507,6 +617,8 @@ function App() {
             setVisitors={setVisitors}
             staff={STAFF_ROSTER}
             showToast={showToast}
+            hostelInfo={hostelInfo}
+            setHostelInfo={setHostelInfo}
           />
         )}
       </main>
@@ -516,7 +628,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold">S</div>
-            <span className="font-semibold text-slate-800 dark:text-slate-200">StayEase Hostel Management System</span>
+            <span className="font-semibold text-slate-800 dark:text-slate-200">{hostelInfo.name}</span>
             <span>&copy; 2026</span>
           </div>
           <div className="flex items-center gap-6">
@@ -534,7 +646,7 @@ function App() {
 // ----------------------------------------------------------------------
 // 1. PUBLIC / CUSTOMER VIEW MODULE
 // ----------------------------------------------------------------------
-function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview, showToast, t }) {
+function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview, showToast, t, hostelInfo }) {
   const [selectedFloor, setSelectedFloor] = useState('ALL');
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [acOnly, setAcOnly] = useState(false);
@@ -546,9 +658,7 @@ function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview
   const filteredRooms = useMemo(() => {
     return rooms.filter((r) => {
       if (selectedFloor !== 'ALL' && r.floor !== Number(selectedFloor)) return false;
-      // Compare case-insensitively: categories arrive as either 'Triple' or
-      // 'triple' depending on whether they came from the mock seed or the API.
-      if (selectedCategory !== 'ALL' && String(r.category).toLowerCase() !== selectedCategory.toLowerCase()) return false;
+      if (selectedCategory !== 'ALL' && r.category !== selectedCategory) return false;
       if (acOnly && !r.ac) return false;
       return true;
     });
@@ -566,6 +676,8 @@ function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview
     }
   };
 
+  const totalBedsInInventory = useMemo(() => rooms.reduce((acc, r) => acc + (r.totalBeds || 0), 0), [rooms]);
+
   return (
     <div className="space-y-10">
       {/* Hero Banner */}
@@ -573,13 +685,13 @@ function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview
         <div className="relative z-10 max-w-2xl space-y-6">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-brand-500/20 text-brand-300 text-xs font-semibold border border-brand-400/30">
             <i data-lucide="sparkles" className="w-3.5 h-3.5"></i>
-            Premium Student & Professional Residence
+            {hostelInfo?.tagline || 'Premium Student & Professional Residence'}
           </span>
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight leading-tight">
-            {t.heroTitle}
+            {hostelInfo?.name || t.heroTitle}
           </h1>
           <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-            {t.heroSubtitle}
+            {hostelInfo?.address ? `${hostelInfo.address} • ` : ''}{t.heroSubtitle}
           </p>
           <div className="flex flex-wrap items-center gap-4 pt-2">
             <a
@@ -602,15 +714,15 @@ function PublicCustomerView({ rooms, weeklyMenu, landmarks, reviews, onAddReview
         {/* Stats Grid overlay */}
         <div className="mt-8 pt-8 border-t border-white/10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <div className="text-2xl font-black text-brand-300">4</div>
+            <div className="text-2xl font-black text-brand-300">{hostelInfo?.totalFloors || 4}</div>
             <div className="text-xs text-slate-400 font-medium">{t.totalFloors}</div>
           </div>
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <div className="text-2xl font-black text-emerald-400">120+</div>
+            <div className="text-2xl font-black text-emerald-400">{totalBedsInInventory || hostelInfo?.totalBeds || 120} Beds</div>
             <div className="text-xs text-slate-400 font-medium">{t.totalBeds}</div>
           </div>
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
-            <div className="text-2xl font-black text-amber-300">8 Units</div>
+            <div className="text-2xl font-black text-amber-300">{hostelInfo?.washingMachines || 8} Units</div>
             <div className="text-xs text-slate-400 font-medium">{t.washingMachines}</div>
           </div>
           <div className="p-3 rounded-2xl bg-white/5 border border-white/10">
@@ -1857,16 +1969,278 @@ function TenantPortalView({ rooms, tickets, notices, onAddTicket, showToast }) {
 // ----------------------------------------------------------------------
 // 4. MANAGER & ADMIN DASHBOARD VIEW MODULE
 // ----------------------------------------------------------------------
-function ManagerDashboardView({ rooms, setRooms, tickets, setTickets, expenses, setExpenses, visitors, setVisitors, staff, showToast }) {
-  const [activeTab, setActiveTab] = useState('OCCUPANCY');
+function ManagerDashboardView({ rooms, setRooms, tickets, setTickets, expenses, setExpenses, visitors, setVisitors, staff, showToast, hostelInfo, setHostelInfo }) {
+  const [activeTab, setActiveTab] = useState(() => {
+    return window.location.hash === '#settings' ? 'SETTINGS' : 'OCCUPANCY';
+  });
 
   // Stats calculation
   const totalBeds = useMemo(() => rooms.reduce((acc, r) => acc + r.totalBeds, 0), [rooms]);
   const occupiedBeds = useMemo(() => rooms.reduce((acc, r) => acc + (r.totalBeds - r.availableBeds), 0), [rooms]);
-  const occupancyPercentage = totalBeds > 0 ? Math.round((occupiedBeds / totalBeds) * 100) : 0;
+  const occupancyPercentage = Math.round((occupiedBeds / totalBeds) * 100);
 
   // New Expense form state
   const [newExpense, setNewExpense] = useState({ title: '', category: 'Utilities', amount: '' });
+
+  // Admin Hostel Profile & Customization State
+  const [hostelForm, setHostelForm] = useState({
+    name: hostelInfo?.name || '',
+    tagline: hostelInfo?.tagline || '',
+    address: hostelInfo?.address || '',
+    managerName: hostelInfo?.managerName || '',
+    contactPhone: hostelInfo?.contactPhone || '',
+    contactEmail: hostelInfo?.contactEmail || '',
+    emergencyPhone: hostelInfo?.emergencyPhone || '',
+    totalFloors: hostelInfo?.totalFloors || 4,
+    washingMachines: hostelInfo?.washingMachines || 8,
+    rules: hostelInfo?.rules ? [...hostelInfo.rules] : []
+  });
+
+  useEffect(() => {
+    if (hostelInfo) {
+      setHostelForm({
+        name: hostelInfo.name || '',
+        tagline: hostelInfo.tagline || '',
+        address: hostelInfo.address || '',
+        managerName: hostelInfo.managerName || '',
+        contactPhone: hostelInfo.contactPhone || '',
+        contactEmail: hostelInfo.contactEmail || '',
+        emergencyPhone: hostelInfo.emergencyPhone || '',
+        totalFloors: hostelInfo.totalFloors || 4,
+        washingMachines: hostelInfo.washingMachines || 8,
+        rules: hostelInfo.rules ? [...hostelInfo.rules] : []
+      });
+    }
+  }, [hostelInfo]);
+
+  const [newRuleText, setNewRuleText] = useState('');
+  const [showAddRoomModal, setShowAddRoomModal] = useState(false);
+  const [jsonModalOpen, setJsonModalOpen] = useState(false);
+  const [importJsonText, setImportJsonText] = useState('');
+
+  const [newRoomForm, setNewRoomForm] = useState({
+    roomNumber: '',
+    floor: 1,
+    category: 'Double',
+    type: 'Double Sharing AC',
+    ac: true,
+    pricePerMonth: 8500,
+    deposit: 10000,
+    totalBeds: 2,
+    amenities: 'Attached Bath, Fast WiFi, Study Desk, Geyser',
+    image: 'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80'
+  });
+
+  const handleSaveHostelProfile = (e) => {
+    e.preventDefault();
+    if (!hostelForm.name || !hostelForm.address || !hostelForm.contactPhone) {
+      showToast('Please fill in required fields: Name, Address, and Phone.', 'error');
+      return;
+    }
+    const updated = {
+      ...hostelInfo,
+      ...hostelForm,
+      totalFloors: Number(hostelForm.totalFloors) || 4,
+      washingMachines: Number(hostelForm.washingMachines) || 0
+    };
+    setHostelInfo(updated);
+
+    if (window.StayEaseApi) {
+      window.StayEaseApi.updateHostel({
+        name: updated.name,
+        address: updated.address,
+        contact_phone: updated.contactPhone,
+        contact_email: updated.contactEmail,
+        manager_name: updated.managerName,
+        total_floors: updated.totalFloors,
+        total_rooms: rooms.length,
+        total_beds: totalBeds,
+        washing_machines: updated.washingMachines,
+        rules: updated.rules
+      }).catch(() => {});
+    }
+
+    showToast('Hostel profile, rules, and contact info updated successfully!', 'success');
+  };
+
+  const handleAddRule = () => {
+    if (!newRuleText.trim()) return;
+    setHostelForm({ ...hostelForm, rules: [...hostelForm.rules, newRuleText.trim()] });
+    setNewRuleText('');
+  };
+
+  const handleDeleteRule = (index) => {
+    setHostelForm({ ...hostelForm, rules: hostelForm.rules.filter((_, i) => i !== index) });
+  };
+
+  const handleAddRoom = (e) => {
+    e.preventDefault();
+    if (!newRoomForm.roomNumber) {
+      showToast('Please provide a Room Number.', 'error');
+      return;
+    }
+
+    if (rooms.some(r => String(r.roomNumber) === String(newRoomForm.roomNumber))) {
+      showToast(`Room ${newRoomForm.roomNumber} already exists in inventory!`, 'error');
+      return;
+    }
+
+    const bedCount = Number(newRoomForm.totalBeds) || 1;
+    const bedLetters = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+    const generatedBeds = [];
+    for (let i = 0; i < bedCount; i++) {
+      generatedBeds.push({
+        id: `${newRoomForm.roomNumber}-${bedLetters[i] || i + 1}`,
+        status: 'Available',
+        tenant: null
+      });
+    }
+
+    const createdRoom = {
+      id: `R${newRoomForm.roomNumber}`,
+      roomNumber: String(newRoomForm.roomNumber),
+      floor: Number(newRoomForm.floor) || 1,
+      type: newRoomForm.type || `${newRoomForm.category} Sharing`,
+      category: newRoomForm.category,
+      ac: Boolean(newRoomForm.ac),
+      pricePerMonth: Number(newRoomForm.pricePerMonth) || 8000,
+      deposit: Number(newRoomForm.deposit) || 10000,
+      totalBeds: bedCount,
+      availableBeds: bedCount,
+      amenities: typeof newRoomForm.amenities === 'string'
+        ? newRoomForm.amenities.split(',').map(s => s.trim()).filter(Boolean)
+        : newRoomForm.amenities,
+      image: newRoomForm.image || 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
+      beds: generatedBeds
+    };
+
+    setRooms([...rooms, createdRoom]);
+
+    if (window.StayEaseApi) {
+      window.StayEaseApi.createRoom({
+        id: createdRoom.id,
+        roomNumber: createdRoom.roomNumber,
+        floor: createdRoom.floor,
+        type: createdRoom.type,
+        category: createdRoom.category,
+        ac: createdRoom.ac ? 1 : 0,
+        pricePerMonth: createdRoom.pricePerMonth,
+        deposit: createdRoom.deposit,
+        totalBeds: createdRoom.totalBeds,
+        availableBeds: createdRoom.availableBeds,
+        amenities: createdRoom.amenities,
+        image: createdRoom.image,
+        beds: createdRoom.beds
+      }).catch(() => {});
+    }
+
+    showToast(`Room ${createdRoom.roomNumber} created with ${bedCount} beds!`, 'success');
+    setShowAddRoomModal(false);
+    setNewRoomForm({
+      roomNumber: '',
+      floor: 1,
+      category: 'Double',
+      type: 'Double Sharing AC',
+      ac: true,
+      pricePerMonth: 8500,
+      deposit: 10000,
+      totalBeds: 2,
+      amenities: 'Attached Bath, Fast WiFi, Study Desk, Geyser',
+      image: 'https://images.unsplash.com/photo-1595526114035-0d45ed16cfbf?auto=format&fit=crop&w=800&q=80'
+    });
+  };
+
+  const handleDeleteRoom = (roomId, roomNum) => {
+    if (confirm(`Are you sure you want to delete Room ${roomNum} and its beds?`)) {
+      setRooms(rooms.filter(r => r.id !== roomId));
+      if (window.StayEaseApi) {
+        window.StayEaseApi.deleteRoom(roomId).catch(() => {});
+      }
+      showToast(`Room ${roomNum} deleted from inventory.`, 'info');
+    }
+  };
+
+  const handleApplyTemplate = (templateKey) => {
+    const tpl = HOSTEL_TEMPLATES[templateKey];
+    if (!tpl) return;
+    const updated = {
+      ...hostelInfo,
+      name: tpl.name,
+      tagline: tpl.tagline,
+      address: tpl.address,
+      managerName: tpl.managerName,
+      contactPhone: tpl.contactPhone,
+      contactEmail: tpl.contactEmail,
+      emergencyPhone: tpl.emergencyPhone,
+      totalFloors: tpl.totalFloors,
+      washingMachines: tpl.washingMachines,
+      rules: [...tpl.rules]
+    };
+    setHostelForm({
+      name: tpl.name,
+      tagline: tpl.tagline,
+      address: tpl.address,
+      managerName: tpl.managerName,
+      contactPhone: tpl.contactPhone,
+      contactEmail: tpl.contactEmail,
+      emergencyPhone: tpl.emergencyPhone,
+      totalFloors: tpl.totalFloors,
+      washingMachines: tpl.washingMachines,
+      rules: [...tpl.rules]
+    });
+    setHostelInfo(updated);
+    showToast(`Loaded "${tpl.name}" preset!`, 'success');
+  };
+
+  const handleExportJson = () => {
+    const data = {
+      hostel: hostelInfo,
+      rooms: rooms
+    };
+    const jsonStr = JSON.stringify(data, null, 2);
+    setImportJsonText(jsonStr);
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(jsonStr).then(() => {
+        showToast('Hostel setup JSON copied to clipboard!', 'success');
+      }).catch(() => {
+        showToast('Hostel JSON ready in the box below.', 'info');
+      });
+    } else {
+      showToast('Hostel JSON ready in the box below.', 'info');
+    }
+  };
+
+  const handleImportJson = () => {
+    try {
+      const parsed = JSON.parse(importJsonText);
+      if (!parsed.hostel && !parsed.rooms) {
+        throw new Error('Invalid JSON format. Expecting "hostel" or "rooms" fields.');
+      }
+      if (parsed.hostel) {
+        setHostelInfo(parsed.hostel);
+        setHostelForm({
+          name: parsed.hostel.name || '',
+          tagline: parsed.hostel.tagline || '',
+          address: parsed.hostel.address || '',
+          managerName: parsed.hostel.managerName || '',
+          contactPhone: parsed.hostel.contactPhone || '',
+          contactEmail: parsed.hostel.contactEmail || '',
+          emergencyPhone: parsed.hostel.emergencyPhone || '',
+          totalFloors: parsed.hostel.totalFloors || 4,
+          washingMachines: parsed.hostel.washingMachines || 8,
+          rules: parsed.hostel.rules || []
+        });
+      }
+      if (Array.isArray(parsed.rooms) && parsed.rooms.length > 0) {
+        setRooms(parsed.rooms);
+      }
+      showToast('Hostel details and inventory imported successfully!', 'success');
+      setJsonModalOpen(false);
+    } catch (err) {
+      showToast('Failed to parse JSON: ' + err.message, 'error');
+    }
+  };
 
   const handleAddExpense = (e) => {
     e.preventDefault();
@@ -1941,7 +2315,8 @@ function ManagerDashboardView({ rooms, setRooms, tickets, setTickets, expenses, 
           { id: 'TENANTS', label: 'Tenant Directory', icon: 'users' },
           { id: 'MAINTENANCE', label: 'Maintenance Hub', icon: 'wrench' },
           { id: 'EXPENSES', label: 'Expense Tracker', icon: 'dollar-sign' },
-          { id: 'VISITORS', label: 'Visitor Log', icon: 'clipboard-list' }
+          { id: 'VISITORS', label: 'Visitor Log', icon: 'clipboard-list' },
+          { id: 'SETTINGS', label: 'Hostel Settings & Setup', icon: 'settings' }
         ].map((tab) => (
           <button
             key={tab.id}
@@ -2199,6 +2574,568 @@ function ManagerDashboardView({ rooms, setRooms, tickets, setTickets, expenses, 
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+      {/* 6. HOSTEL SETTINGS & CUSTOMIZATION TAB */}
+      {activeTab === 'SETTINGS' && (
+        <div className="space-y-8">
+          {/* Quick Action Top Alert */}
+          <div className="bg-gradient-to-r from-brand-900/50 via-indigo-900/40 to-slate-900/60 p-6 sm:p-8 rounded-3xl border border-brand-500/30 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="px-2.5 py-0.5 rounded-full bg-brand-500/20 text-brand-300 border border-brand-500/30 text-[10px] font-bold uppercase tracking-wider">
+                  Admin Control Center
+                </span>
+                <h3 className="text-xl font-bold text-slate-900 dark:text-white">Hostel Profile & Customization</h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-300 mt-1 max-w-xl">
+                Customize this system for any hostel: update branding, warden contacts, curfew rules, and rooms inventory, or switch between pre-configured presets.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <button
+                onClick={() => setJsonModalOpen(true)}
+                className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-xl border border-slate-700 transition flex items-center gap-1.5"
+              >
+                <i data-lucide="file-json" className="w-4 h-4"></i>
+                Import / Export JSON
+              </button>
+              <button
+                onClick={() => setShowAddRoomModal(true)}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl shadow-md shadow-brand-600/30 transition flex items-center gap-1.5"
+              >
+                <i data-lucide="plus-circle" className="w-4 h-4"></i>
+                + Add New Room
+              </button>
+            </div>
+          </div>
+
+          {/* One-Click Template Quick Switcher */}
+          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="font-bold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <i data-lucide="sparkles" className="w-4 h-4 text-amber-500"></i>
+                One-Click Hostel Type Presets
+              </h4>
+              <span className="text-[11px] text-slate-400">Instantly applies tailored rules, branding & contact structures</span>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <button
+                onClick={() => handleApplyTemplate('COLLEGE')}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-brand-500/50 hover:bg-brand-500/5 text-left transition group"
+              >
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white group-hover:text-brand-500">
+                  <i data-lucide="graduation-cap" className="w-4 h-4"></i>
+                  College / Student Hostel
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">Biometric curfew, study hours, mess schedule, shared student bunks.</p>
+              </button>
+              <button
+                onClick={() => handleApplyTemplate('PROFESSIONAL')}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-emerald-500/50 hover:bg-emerald-500/5 text-left transition group"
+              >
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white group-hover:text-emerald-500">
+                  <i data-lucide="briefcase" className="w-4 h-4"></i>
+                  Executive Co-Living / PG
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">Flexible curfew, 1 Gbps WiFi, AC suites, quiet zones for remote work.</p>
+              </button>
+              <button
+                onClick={() => handleApplyTemplate('WOMEN')}
+                className="p-4 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-pink-500/50 hover:bg-pink-500/5 text-left transition group"
+              >
+                <div className="flex items-center gap-2 font-bold text-xs text-slate-900 dark:text-white group-hover:text-pink-500">
+                  <i data-lucide="shield" className="w-4 h-4"></i>
+                  Women's Safety First PG
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1 line-clamp-2">Strict visitor lounge access, 24/7 CCTV, warden check-ins & health care.</p>
+              </button>
+            </div>
+          </div>
+
+          {/* Form 1: General Hostel Profile & Contact */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm space-y-6">
+              <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4">
+                <div>
+                  <h4 className="font-extrabold text-base text-slate-900 dark:text-white">General Information & Branding</h4>
+                  <p className="text-xs text-slate-400">These details appear across resident onboarding, public pages, and invoices.</p>
+                </div>
+                <span className="text-xs font-mono font-bold text-brand-600 bg-brand-50 dark:bg-brand-950 px-2 py-1 rounded-lg">ID: #HOSTEL-1</span>
+              </div>
+
+              <form onSubmit={handleSaveHostelProfile} className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Hostel / PG Name *</label>
+                    <input
+                      type="text"
+                      value={hostelForm.name}
+                      onChange={(e) => setHostelForm({ ...hostelForm, name: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. Royal Orchid Student Hostel"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Subtitle / Tagline</label>
+                    <input
+                      type="text"
+                      value={hostelForm.tagline}
+                      onChange={(e) => setHostelForm({ ...hostelForm, tagline: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. Premium Living Near Tech University"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Full Physical Address *</label>
+                  <input
+                    type="text"
+                    value={hostelForm.address}
+                    onChange={(e) => setHostelForm({ ...hostelForm, address: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    placeholder="e.g. Plot 42, University Road, Sector 5"
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Warden / Manager Name</label>
+                    <input
+                      type="text"
+                      value={hostelForm.managerName}
+                      onChange={(e) => setHostelForm({ ...hostelForm, managerName: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. Ramesh Sharma"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Official Contact Phone *</label>
+                    <input
+                      type="text"
+                      value={hostelForm.contactPhone}
+                      onChange={(e) => setHostelForm({ ...hostelForm, contactPhone: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. +91 98999 11111"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Contact Email</label>
+                    <input
+                      type="email"
+                      value={hostelForm.contactEmail}
+                      onChange={(e) => setHostelForm({ ...hostelForm, contactEmail: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. info@stayease.com"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Emergency SOS Phone</label>
+                    <input
+                      type="text"
+                      value={hostelForm.emergencyPhone}
+                      onChange={(e) => setHostelForm({ ...hostelForm, emergencyPhone: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                      placeholder="e.g. +91 98999 33333"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Total Floors</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={hostelForm.totalFloors}
+                      onChange={(e) => setHostelForm({ ...hostelForm, totalFloors: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Washing Machines</label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="50"
+                      value={hostelForm.washingMachines}
+                      onChange={(e) => setHostelForm({ ...hostelForm, washingMachines: e.target.value })}
+                      className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    type="submit"
+                    className="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-lg shadow-brand-600/30 transition flex items-center gap-2"
+                  >
+                    <i data-lucide="check" className="w-4 h-4"></i>
+                    Save & Apply Hostel Details
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Rules Editor */}
+            <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col justify-between space-y-4">
+              <div>
+                <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                  <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Hostel Rules & Curfew</h4>
+                  <span className="text-[11px] font-bold text-slate-400">{hostelForm.rules.length} Rules Active</span>
+                </div>
+
+                <div className="space-y-2 mt-4 max-h-72 overflow-y-auto pr-1">
+                  {hostelForm.rules.map((rule, idx) => (
+                    <div key={idx} className="flex items-start justify-between gap-2 p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-700/60 text-xs">
+                      <span className="text-slate-700 dark:text-slate-300 font-medium leading-relaxed">
+                        <span className="font-bold text-brand-600 mr-1.5">{idx + 1}.</span> {rule}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteRule(idx)}
+                        className="text-slate-400 hover:text-rose-500 transition p-1 shrink-0"
+                        title="Remove rule"
+                      >
+                        <i data-lucide="x" className="w-3.5 h-3.5"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex gap-2">
+                  <input
+                    type="text"
+                    value={newRuleText}
+                    onChange={(e) => setNewRuleText(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddRule(); } }}
+                    placeholder="e.g. Gate closes strictly at 10 PM"
+                    className="flex-1 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddRule}
+                    className="px-3.5 py-2.5 bg-slate-200 dark:bg-slate-700 hover:bg-brand-600 hover:text-white text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition"
+                  >
+                    + Add
+                  </button>
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-400 italic">Rules are shown to all new applicants in the onboarding portal.</p>
+            </div>
+          </div>
+
+          {/* Section 2: Room Inventory Management Table */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 dark:border-slate-800 pb-4">
+              <div>
+                <h4 className="font-extrabold text-base text-slate-900 dark:text-white">Active Rooms & Beds Inventory</h4>
+                <p className="text-xs text-slate-400">Total {rooms.length} rooms configured with {totalBeds} total beds across {hostelForm.totalFloors} floors.</p>
+              </div>
+              <button
+                onClick={() => setShowAddRoomModal(true)}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white text-xs font-bold rounded-xl shadow-md shadow-brand-600/30 transition flex items-center gap-1.5 self-start sm:self-auto"
+              >
+                <i data-lucide="plus" className="w-4 h-4"></i>
+                Add Room
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 dark:bg-slate-800/80 text-slate-400 font-bold uppercase">
+                  <tr>
+                    <th className="p-3">Room #</th>
+                    <th className="p-3">Floor</th>
+                    <th className="p-3">Category & Type</th>
+                    <th className="p-3">AC</th>
+                    <th className="p-3">Rent / Mo</th>
+                    <th className="p-3">Deposit</th>
+                    <th className="p-3">Beds (Avail / Total)</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                  {rooms.map((r) => (
+                    <tr key={r.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                      <td className="p-3 font-bold text-slate-900 dark:text-white">
+                        Room {r.roomNumber}
+                      </td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300 font-medium">Floor {r.floor}</td>
+                      <td className="p-3 text-slate-600 dark:text-slate-300">
+                        <span className="font-semibold">{r.type}</span>
+                        <span className="text-[10px] text-slate-400 ml-1.5">({r.category})</span>
+                      </td>
+                      <td className="p-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${r.ac ? 'bg-sky-100 dark:bg-sky-950 text-sky-600' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                          {r.ac ? 'AC' : 'Non-AC'}
+                        </span>
+                      </td>
+                      <td className="p-3 font-bold text-brand-600">₹{r.pricePerMonth?.toLocaleString()}</td>
+                      <td className="p-3 text-slate-500">₹{r.deposit?.toLocaleString()}</td>
+                      <td className="p-3 font-semibold">
+                        <span className="text-emerald-600 font-bold">{r.availableBeds}</span>
+                        <span className="text-slate-400"> / {r.totalBeds} beds</span>
+                        <div className="flex gap-1 mt-1">
+                          {r.beds.map((b) => (
+                            <span
+                              key={b.id}
+                              title={`Bed ${b.id}: ${b.status}`}
+                              className={`w-2 h-2 rounded-full ${b.status === 'Available' ? 'bg-emerald-500' : 'bg-rose-500'}`}
+                            ></span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="p-3 text-right">
+                        <button
+                          onClick={() => handleDeleteRoom(r.id, r.roomNumber)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition"
+                          title="Delete Room"
+                        >
+                          <i data-lucide="trash-2" className="w-4 h-4"></i>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD NEW ROOM MODAL */}
+      {showAddRoomModal && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 max-w-lg w-full rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i data-lucide="door-open" className="w-5 h-5 text-brand-600"></i>
+                Add New Room to Inventory
+              </h3>
+              <button onClick={() => setShowAddRoomModal(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" className="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <form onSubmit={handleAddRoom} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Room Number *</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 204"
+                    value={newRoomForm.roomNumber}
+                    onChange={(e) => setNewRoomForm({ ...newRoomForm, roomNumber: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Floor *</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="20"
+                    value={newRoomForm.floor}
+                    onChange={(e) => setNewRoomForm({ ...newRoomForm, floor: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Category</label>
+                  <select
+                    value={newRoomForm.category}
+                    onChange={(e) => {
+                      const cat = e.target.value;
+                      const totalB = cat === 'Single' ? 1 : cat === 'Double' ? 2 : cat === 'Triple' ? 3 : 4;
+                      setNewRoomForm({
+                        ...newRoomForm,
+                        category: cat,
+                        totalBeds: totalB,
+                        type: `${cat} Sharing ${newRoomForm.ac ? 'AC' : 'Non-AC'}`
+                      });
+                    }}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                  >
+                    <option value="Single">Single (1 Bed)</option>
+                    <option value="Double">Double (2 Beds)</option>
+                    <option value="Triple">Triple (3 Beds)</option>
+                    <option value="Four Sharing">Four Sharing (4 Beds)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Beds to Generate</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="8"
+                    value={newRoomForm.totalBeds}
+                    onChange={(e) => setNewRoomForm({ ...newRoomForm, totalBeds: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Display Title / Type</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Deluxe Double Sharing AC"
+                  value={newRoomForm.type}
+                  onChange={(e) => setNewRoomForm({ ...newRoomForm, type: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Monthly Rent (₹) *</label>
+                  <input
+                    type="number"
+                    placeholder="8500"
+                    value={newRoomForm.pricePerMonth}
+                    onChange={(e) => setNewRoomForm({ ...newRoomForm, pricePerMonth: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Security Deposit (₹)</label>
+                  <input
+                    type="number"
+                    placeholder="10000"
+                    value={newRoomForm.deposit}
+                    onChange={(e) => setNewRoomForm({ ...newRoomForm, deposit: e.target.value })}
+                    className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl">
+                <input
+                  type="checkbox"
+                  id="ac-toggle"
+                  checked={newRoomForm.ac}
+                  onChange={(e) => setNewRoomForm({ ...newRoomForm, ac: e.target.checked })}
+                  className="w-4 h-4 rounded text-brand-600 focus:ring-brand-500"
+                />
+                <label htmlFor="ac-toggle" className="text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer">
+                  Air Conditioning (AC) Included in this Room
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Amenities (comma separated)</label>
+                <input
+                  type="text"
+                  placeholder="Attached Bath, Study Desk, Geyser, High-Speed WiFi"
+                  value={newRoomForm.amenities}
+                  onChange={(e) => setNewRoomForm({ ...newRoomForm, amenities: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">Room Photo URL</label>
+                <input
+                  type="url"
+                  placeholder="https://images.unsplash.com/..."
+                  value={newRoomForm.image}
+                  onChange={(e) => setNewRoomForm({ ...newRoomForm, image: e.target.value })}
+                  className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-xs font-semibold p-2.5 rounded-xl border border-slate-200 dark:border-slate-700"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddRoomModal(false)}
+                  className="px-4 py-2.5 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-brand-600 hover:bg-brand-500 text-white font-bold text-xs rounded-xl shadow-md transition"
+                >
+                  Create Room & Beds
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* IMPORT / EXPORT JSON MODAL */}
+      {jsonModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 max-w-lg w-full rounded-3xl shadow-2xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <i data-lucide="file-json" className="w-5 h-5 text-brand-600"></i>
+                Backup & Import Hostel Configuration
+              </h3>
+              <button onClick={() => setJsonModalOpen(false)} className="text-slate-400 hover:text-slate-600 p-1">
+                <i data-lucide="x" className="w-5 h-5"></i>
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Export your current hostel setup and room inventory as a JSON backup, or paste a new hostel configuration to reconfigure the system in 1 click.
+            </p>
+
+            <div>
+              <button
+                onClick={handleExportJson}
+                className="w-full py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-brand-600 hover:text-white text-slate-700 dark:text-slate-200 font-bold text-xs rounded-xl transition flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700"
+              >
+                <i data-lucide="download" className="w-4 h-4"></i>
+                Export / Copy Current Config JSON
+              </button>
+            </div>
+
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">Paste JSON to Import</label>
+              <textarea
+                rows="6"
+                value={importJsonText}
+                onChange={(e) => setImportJsonText(e.target.value)}
+                placeholder={`{\n  "hostel": { "name": "...", "address": "..." },\n  "rooms": [ ... ]\n}`}
+                className="w-full bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white font-mono text-[11px] p-3 rounded-xl border border-slate-200 dark:border-slate-700 focus:outline-none"
+              ></textarea>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setJsonModalOpen(false)}
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleImportJson}
+                className="px-5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5"
+              >
+                <i data-lucide="upload" className="w-4 h-4"></i>
+                Apply & Overwrite
+              </button>
+            </div>
           </div>
         </div>
       )}
