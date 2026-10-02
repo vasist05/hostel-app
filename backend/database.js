@@ -12,6 +12,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.error('Failed to open database at ' + dbPath, err.message);
   } else {
     console.log('Connected to SQLite database at: ' + dbPath);
+    // Enforce referential integrity for every connection.
+    db.run('PRAGMA foreign_keys = ON');
   }
 });
 
@@ -201,15 +203,17 @@ async function seedDatabase() {
       `INSERT INTO hostels (id, name, address, contact_phone, contact_email, manager_name, total_floors, total_rooms, total_beds, washing_machines, rules)
        VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        'Relic Stays',
-        'beside sitara hotel, golden mile road , kokapet ,hyderabad',
-        '+91 89785 98292',
-        'info@stayease.com',
+        // NOTE: All values below are fictional demo data for development.
+        // The hostel admin can update these via the Settings tab in the UI.
+        'StayEase Demo Hostel',
+        'Plot 42, University Road, Sector 5, Knowledge City',
+        '+91 98000 00001',
+        'info@stayease-demo.example',
         'Ramesh Sharma',
-        6,
-        40,
-        120,
-        3,
+        4,
+        7,   // matches the 7 rooms actually seeded below
+        14,  // matches the 14 beds actually seeded below
+        8,
         JSON.stringify([
           'Gate closes strictly at 10:30 PM.',
           'Visitors permitted only in lounge between 9 AM to 7 PM.',
@@ -229,14 +233,15 @@ async function seedDatabase() {
         id: 'R101',
         roomNumber: '101',
         floor: 1,
-        type: 'three sharing',
-        category: 'triple',
-        ac: 1,
-        pricePerMonth: 12000,
-        deposit: 15000,
-        totalBeds: 3,
+        type: 'Single Non-AC',
+        category: 'Single',
+        ac: 0,
+        pricePerMonth: 7000,
+        deposit: 9000,
+        // totalBeds must equal the number of beds in the beds array below.
+        totalBeds: 1,
         availableBeds: 1,
-        amenities: ['Private Balcony', 'Attached Bath', 'Study Desk', 'Ergonomic Chair', '1Gbps WiFi', 'Geyser'],
+        amenities: ['Attached Bath', 'Study Desk', 'Ceiling Fan', 'Spacious Locker'],
         image: 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80',
         beds: [
           { id: '101-A', status: 'Available', tenant: null, phone: null, joinDate: null, paymentStatus: null }

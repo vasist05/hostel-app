@@ -8,10 +8,6 @@ app.compiled.js
 # Duplicate build script (use scripts/build.js instead)
 compile.js
 
-# Lock files (optional — remove if you want reproducible installs)
-package-lock.json
-backend/package-lock.json
-
 # SQLite database (runtime data — don't version control)
 backend/hostel.db
 

@@ -3,6 +3,7 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { randomUUID } = require('crypto');
 
 // Load backend/.env with Node's built-in loader (no dotenv dependency required).
 // This has to happen before './database' is required, because database.js reads
@@ -239,41 +240,51 @@ app.post('/api/rooms', async (req, res) => {
     const rAmenities = typeof amenities === 'object' ? JSON.stringify(amenities) : (amenities || '[]');
     const rImage = image || image_url || 'https://images.unsplash.com/photo-1555854877-bab0e564b8d5?auto=format&fit=crop&w=800&q=80';
 
-    await runAsync(
-      `INSERT INTO rooms (id, room_number, floor, type, category, ac, price_per_month, deposit, total_beds, available_beds, amenities, image_url)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [rId, rNumber, rFloor, rType, rCat, rAc, rPrice, rDeposit, rTotal, rAvail, rAmenities, rImage]
-    );
+    // Wrap room + bed inserts in a transaction so a partial failure doesn't
+    // leave an orphaned room row with no beds.
+    await runAsync('BEGIN');
+    try {
+      await runAsync(
+        `INSERT INTO rooms (id, room_number, floor, type, category, ac, price_per_month, deposit, total_beds, available_beds, amenities, image_url)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [rId, rNumber, rFloor, rType, rCat, rAc, rPrice, rDeposit, rTotal, rAvail, rAmenities, rImage]
+      );
 
-    // If beds array was provided, create beds
-    if (Array.isArray(beds) && beds.length > 0) {
-      for (const b of beds) {
-        const bedId = b.id || `${rNumber}-A`;
-        await runAsync(
-          `INSERT INTO beds (id, room_id, bed_id, status, tenant_name, tenant_phone, join_date, payment_status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            `${rId}-${bedId}`,
-            rId,
-            bedId,
-            b.status || 'Available',
-            b.tenant || b.tenant_name || null,
-            b.phone || b.tenant_phone || null,
-            b.joinDate || b.join_date || null,
-            b.paymentStatus || b.payment_status || null
-          ]
-        );
+      // If beds array was provided, create beds
+      if (Array.isArray(beds) && beds.length > 0) {
+        for (const b of beds) {
+          const bedId = b.id || `${rNumber}-A`;
+          await runAsync(
+            `INSERT INTO beds (id, room_id, bed_id, status, tenant_name, tenant_phone, join_date, payment_status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              `${rId}-${bedId}`,
+              rId,
+              bedId,
+              b.status || 'Available',
+              b.tenant || b.tenant_name || null,
+              b.phone || b.tenant_phone || null,
+              b.joinDate || b.join_date || null,
+              b.paymentStatus || b.payment_status || null
+            ]
+          );
+        }
+      } else {
+        // Auto-generate default beds
+        const letters = ['A', 'B', 'C', 'D'];
+        for (let i = 0; i < rTotal; i++) {
+          const bedId = `${rNumber}-${letters[i] || (i + 1)}`;
+          await runAsync(
+            `INSERT INTO beds (id, room_id, bed_id, status) VALUES (?, ?, ?, 'Available')`,
+            [`${rId}-${bedId}`, rId, bedId]
+          );
+        }
       }
-    } else {
-      // Auto-generate default beds
-      const letters = ['A', 'B', 'C', 'D'];
-      for (let i = 0; i < rTotal; i++) {
-        const bedId = `${rNumber}-${letters[i] || (i + 1)}`;
-        await runAsync(
-          `INSERT INTO beds (id, room_id, bed_id, status) VALUES (?, ?, ?, 'Available')`,
-          [`${rId}-${bedId}`, rId, bedId]
-        );
-      }
+
+      await runAsync('COMMIT');
+    } catch (innerErr) {
+      await runAsync('ROLLBACK');
+      throw innerErr;
     }
 
     res.status(201).json({ message: 'Room created successfully', id: rId });
@@ -415,7 +426,13 @@ app.put('/api/beds/:id', async (req, res) => {
 
 app.delete('/api/beds/:id', async (req, res) => {
   try {
-    const result = await runAsync('DELETE FROM beds WHERE id = ? OR bed_id = ?', [req.params.id, req.params.id]);
+    // Use only the primary key `id` column — the old `OR bed_id = ?` clause
+    // matched on the short label (e.g. '101-A') and could accidentally delete
+    // every bed that shared that label across different rooms.
+    const result = await runAsync('DELETE FROM beds WHERE id = ?', [req.params.id]);
+    if (result.changes === 0) {
+      return res.status(404).json({ error: 'Bed not found' });
+    }
     res.json({ message: 'Bed deleted successfully', changes: result.changes });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -437,7 +454,10 @@ app.get('/api/tickets', async (req, res) => {
 app.post('/api/tickets', async (req, res) => {
   try {
     const { id, tenant, room, category, priority, description, status, date, photo } = req.body;
-    const ticketId = id || `T-${Math.floor(100 + Math.random() * 900)}`;
+    // Use crypto.randomUUID() for collision-free IDs — Math.random() only has
+    // 900 possible values in the old `T-${Math.floor(100 + Math.random()*900)}`
+    // pattern, causing frequent primary-key conflicts under load.
+    const ticketId = id || `T-${randomUUID()}`;
     const ticketDate = date || new Date().toISOString().split('T')[0];
 
     await runAsync(
@@ -592,7 +612,9 @@ app.get('/api/visitors', async (req, res) => {
 app.post('/api/visitors', async (req, res) => {
   try {
     const { id, visitorName, visitor_name, hostTenant, host_tenant, room, relation, entryTime, entry_time } = req.body;
-    const vId = id || `V-${Math.floor(500 + Math.random() * 500)}`;
+    // Use crypto.randomUUID() — the old Math.floor(500 + Math.random()*500)
+    // had only 500 possible values and would collide quickly.
+    const vId = id || `V-${randomUUID()}`;
     const vName = visitorName || visitor_name;
     const vHost = hostTenant || host_tenant;
     const vEntry = entryTime || entry_time || new Date().toLocaleString();
