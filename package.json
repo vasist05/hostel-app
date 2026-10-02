@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "StayEase Hostel Management System",
   "scripts": {
+    "build": "node compile.js",
     "start": "npm --prefix backend start",
     "dev": "npm --prefix backend run dev",
     "test": "npm --prefix backend test"
