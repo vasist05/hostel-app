@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>StayEase - Complete Hostel Management System</title>
+  <title>StayEase - Manager Dashboard</title>
   
   <!-- Material Symbols & Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -121,33 +121,12 @@
 </head>
 <body class="bg-surface text-on-surface font-sans transition-colors duration-300 min-h-screen selection:bg-brand-500 selection:text-white">
 
-  <!-- Stitch System Central Operations Launch Bar -->
-  <div class="bg-gradient-to-r from-brand-950 via-slate-900 to-indigo-950 border-b border-brand-500/30 px-4 py-2 text-xs flex flex-wrap items-center justify-between gap-3 shadow-lg z-50 relative">
-    <div class="flex items-center gap-2.5">
-      <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/15 text-secondary border border-secondary/30 text-[10px] font-bold uppercase tracking-wider status-glow-success">
-        <span class="w-1.5 h-1.5 rounded-full bg-secondary animate-ping"></span>
-        Stitch System Active
-      </span>
-      <span class="text-slate-300 hidden sm:inline">Stitch MCP Project: <strong class="text-white font-mono">7269909586657254790</strong></span>
-    </div>
-    <div class="flex items-center gap-2">
-      <a href="stitch-ops.html" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-brand-600 hover:bg-brand-500 text-white font-semibold shadow-md shadow-brand-600/30 transition active:scale-95">
-        <span class="material-symbols-outlined text-sm" style="font-size:16px;">dashboard_customize</span>
-        <span>Open Stitch Ops Command</span>
-      </a>
-      <a href="backend-demo.html" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-container-high hover:bg-surface-container-highest text-slate-300 hover:text-white font-medium border border-outline-variant/30 transition">
-        <span class="material-symbols-outlined text-sm" style="font-size:16px;">terminal</span>
-        <span class="hidden md:inline">API Console</span>
-      </a>
-    </div>
-  </div>
-
   <div id="root"></div>
 
   <!-- API Client Utility -->
   <script src="api.js"></script>
 
   <!-- Main Application Script (Pre-compiled with classic runtime for full UMD browser support) -->
-  <script src="app.compiled.js?v=2"></script>
+  <script src="app.compiled.js?v=3"></script>
 </body>
 </html>
