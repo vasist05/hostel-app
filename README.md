@@ -1,4 +1,4 @@
-# 🏨 StayEase — Complete Hostel Management System
+﻿# 🏨 StayEase — Complete Hostel Management System
 
 A full-featured, single-page hostel management web application with a React + JSX frontend and a Node.js / Express + SQLite backend. Designed for hostel owners, managers, tenants, and prospective residents — all in one codebase.
 
@@ -17,6 +17,7 @@ A full-featured, single-page hostel management web application with a React + JS
 9. [Environment Variables](#-environment-variables)
 10. [Data Persistence](#-data-persistence)
 11. [Customization Guide](#-customization-guide)
+12. [npm Scripts Reference](#-npm-scripts-reference)
 
 ---
 
@@ -42,10 +43,9 @@ A full-featured, single-page hostel management web application with a React + JS
 |-----------|------|
 | **React 18** (CDN, no bundler needed) | UI component framework |
 | **JSX** compiled via `@babel/core` | JSX → plain JS transformation |
-| **Tailwind CSS** (CDN) | Utility-first styling, dark mode, container queries |
+| **Tailwind CSS** (CDN) | Utility-first styling, dark mode |
 | **Lucide Icons** (CDN) | Icon library |
 | **Plus Jakarta Sans** (Google Fonts) | Primary typeface |
-| **JetBrains Mono** | Monospace / code blocks |
 
 ### Backend
 | Technology | Role |
@@ -54,7 +54,7 @@ A full-featured, single-page hostel management web application with a React + JS
 | **Express 5** | REST API server |
 | **SQLite3** | Embedded relational database (`hostel.db`) |
 | **body-parser** | JSON/URL-encoded request parsing |
-| **cors** | Cross-origin request handling |
+| **cors** | Cross-origin request handling (respects `CORS_ORIGIN` env var) |
 | **nodemon** | Hot-reload during development |
 
 ---
@@ -66,23 +66,26 @@ hostel-app/
 │
 ├── index.html              # Main entry point — loads React + compiled app
 ├── app.js                  # ⭐ Full React application (JSX source — EDIT THIS)
-├── app.compiled.js         # Auto-generated from app.js — DO NOT edit directly
 ├── api.js                  # Frontend API client (StayEaseApi object)
-├── compile.js              # Build script: Babel JSX → plain JS
 ├── package.json            # Root npm scripts (build, dev, start, test)
+├── package-lock.json       # Locked dependency tree for reproducible installs
+├── babel.config.json       # Babel preset config for JSX compilation
 │
-├── stitch-ops.html         # Stitch UI design/ops dashboard
-├── backend-demo.html       # Standalone backend demo page
+├── scripts/
+│   ├── build.js            # Babel build script: app.js → app.compiled.js
+│   └── dev.js              # Dev launcher: starts backend + watch mode together
 │
 └── backend/
     ├── server.js           # Express REST API — all route handlers
     ├── database.js         # SQLite schema + seed data + helper functions
-    ├── hostel.db           # SQLite database file (auto-created on first run)
     ├── test-api.js         # API integration test runner
-    ├── .env                # Environment config (gitignored)
+    ├── .env                # Environment config (gitignored — never committed)
     ├── .env.example        # Template for environment variables
-    └── package.json        # Backend dependencies
+    ├── package.json        # Backend dependencies
+    └── package-lock.json   # Locked backend dependency tree
 ```
+
+> **Note:** `app.compiled.js` and `backend/hostel.db` are **not** committed to git — they are generated at runtime. Run `npm run build` to generate the compiled JS, and `npm run dev` to create the database on first launch.
 
 ---
 
@@ -105,25 +108,38 @@ npm install --prefix backend
 ### 2. Configure Environment
 
 ```bash
-# Copy the example env file
+# Windows
 copy backend\.env.example backend\.env
+
+# macOS / Linux
+cp backend/.env.example backend/.env
 ```
 
-The defaults work out of the box:
+Default values work out of the box:
 ```
 PORT=5000
 CORS_ORIGIN=*
 DB_PATH=./hostel.db
 ```
 
-### 3. Start the Backend Server
+### 3. Start Everything (Recommended)
 
 ```bash
-# Development mode (auto-restarts on file changes)
 npm run dev
+```
 
-# Production mode
+This runs `scripts/dev.js` which starts the backend with **nodemon** (hot-reload) and automatically rebuilds `app.compiled.js` whenever you save `app.js`.
+
+Or run them separately:
+```bash
+# Terminal 1 — backend
 npm start
+
+# Terminal 2 — rebuild frontend (one-shot)
+npm run build
+
+# Terminal 2 — rebuild frontend (watch mode)
+npm run build:watch
 ```
 
 The API will be live at: **`http://localhost:5000/api`**
@@ -141,7 +157,7 @@ npx -y serve . -p 3000
 # Then open http://localhost:3000
 ```
 
-> **Note:** The app works fully offline — if the backend is not running, all data falls back to `localStorage` automatically with no errors.
+> **Tip:** The app works fully offline — if the backend is not running, all data falls back to `localStorage` automatically with no errors.
 
 ---
 
@@ -171,7 +187,6 @@ Switch roles using the **pill switcher in the top navbar**. No login required.
 - **SOS Emergency Alert** — One-tap emergency broadcast to warden & security desk
 
 ### 🏢 Manager Dashboard
-All tabs are accessible from the manager nav bar:
 
 | Tab | What it manages |
 |-----|----------------|
@@ -190,17 +205,15 @@ All tabs are accessible from the manager nav bar:
 
 **Access:** Manager Dashboard → **"Hostel Settings & Setup"** tab
 
-> Deep-link shortcut: open `index.html#settings` or `index.html#manager` to auto-switch to Admin mode.
-
 ### 🏷️ Hostel Profile Editor
 Edit and instantly apply across the entire UI:
 - Hostel name, tagline, full address
-- Manager / Warden name
-- Contact phone & email
-- Emergency hotline
-- Total floors and washing machine count
+- Manager / Warden name, contact phone & email
+- Emergency hotline, total floors, washing machine count
 
 Click **"Save & Apply Hostel Details"** — the navbar, SOS modal, hero section, and footer all update in real time.
+
+> **First-time setup:** The database seeds with fictional demo data (`StayEase Demo Hostel`). Update your real hostel details here — changes persist to both `localStorage` and the SQLite backend.
 
 ### 📜 Rules & Curfew Editor
 - **Add** a rule by typing and pressing "Add Rule"
@@ -223,28 +236,19 @@ Click **"+ Add New Room"** to open the creation form:
 | Photo URL | Any image URL (Unsplash recommended) |
 
 - **Room Inventory Table** — view all rooms with per-room bed visualization
-- **Delete Room** button removes the room and all its beds
+- **Delete Room** removes the room and all its beds
 
 ### 🎯 One-Click Preset Templates
-Instantly apply a complete hostel profile + rule set:
 
 | Preset | Description |
 |--------|-------------|
-| 🎓 **College** | GreenValley University Campus Hostel — strict 9:30 PM curfew, study quiet hours |
-| 💼 **Professional** | UrbanNest Executive Co-Living — 24/7 keycard access, no curfew, work-ready suites |
-| 👩 **Women** | SafeHaven Women Residence — biometric entry, full CCTV, male visitor restrictions |
+| 🎓 **College** | University Campus Hostel — strict curfew, study quiet hours |
+| 💼 **Professional** | Executive Co-Living — 24/7 keycard access, no curfew |
+| 👩 **Women** | Women Residence — biometric entry, full CCTV, visitor restrictions |
 
 ### 🔄 JSON Backup & Import
-Click **"Backup / Import JSON Config"**:
-
-**Export:** Copies the full hostel config + all rooms as a single JSON blob — paste into any text file to save a snapshot.
-
-**Import:** Paste previously exported JSON and click **"Apply & Overwrite"** to restore that configuration instantly.
-
-Useful for:
-- Backing up before making large changes
-- Migrating configuration between devices or browsers
-- Testing multiple hostel setups quickly
+- **Export:** Copies full hostel config + rooms as a JSON blob — paste into a file to save a snapshot
+- **Import:** Paste previously exported JSON → **"Apply & Overwrite"** to restore instantly
 
 ---
 
@@ -270,18 +274,20 @@ GET  /api/rooms?floor=2           → Filter by floor number
 GET  /api/rooms?ac=true           → Filter by AC availability
 GET  /api/rooms?category=single   → Filter by room category
 GET  /api/rooms/:id               → Single room detail
-POST /api/rooms                   → Create a new room
-PUT  /api/rooms/:id               → Update room details
-DEL  /api/rooms/:id               → Delete room and its beds
+POST /api/rooms                   → Create room + beds (atomic transaction)
+PUT  /api/rooms/:id               → Update room details (partial update safe)
+DEL  /api/rooms/:id               → Delete room and all its beds
 
 GET  /api/rooms/:id/beds          → All beds for a specific room
-PUT  /api/beds/:bedId             → Update a bed (tenant, status, payment status)
+POST /api/rooms/:id/beds          → Add a bed to a room
+PUT  /api/beds/:id                → Update a bed — partial update safe, won't wipe tenant data
+DEL  /api/beds/:id                → Delete a bed by primary key
 ```
 
 ### Maintenance Tickets
 ```
 GET  /api/tickets                 → All tickets
-POST /api/tickets                 → Create a ticket
+POST /api/tickets                 → Create ticket (ID: crypto.randomUUID — collision-free)
 PUT  /api/tickets/:id             → Update ticket status or priority
 DEL  /api/tickets/:id             → Delete a ticket
 ```
@@ -304,7 +310,7 @@ DEL  /api/expenses/:id            → Remove an expense entry
 ### Visitors
 ```
 GET  /api/visitors                → All visitor records
-POST /api/visitors                → Check in a visitor
+POST /api/visitors                → Check in visitor (ID: crypto.randomUUID)
 PUT  /api/visitors/:id/checkout   → Record visitor exit time
 ```
 
@@ -315,16 +321,14 @@ POST /api/bookings                → Submit a new booking request
 PUT  /api/bookings/:id            → Approve or reject a booking
 ```
 
-### Reviews
+### Reviews & Menu & Staff
 ```
 GET  /api/reviews                 → All tenant reviews
 POST /api/reviews                 → Submit a new review
-```
 
-### Mess Menu & Staff
-```
 GET  /api/menu                    → Weekly mess menu
 PUT  /api/menu/:day               → Update a specific day's menu
+
 GET  /api/staff                   → Staff roster
 POST /api/staff                   → Add a new staff member
 ```
@@ -338,32 +342,35 @@ GET  /api/stats                   → Aggregated occupancy, revenue, ticket stat
 
 ## 🔧 Frontend Build Process
 
-The frontend uses JSX which browsers cannot run natively. `compile.js` uses `@babel/core` to transpile `app.js` → `app.compiled.js`.
+The frontend uses JSX which browsers cannot run natively. `scripts/build.js` uses `@babel/core` to transpile `app.js` → `app.compiled.js`.
 
-### Run a build
-
+### One-shot build
 ```bash
 npm run build
-# Output: [Success] Compiled 164315 bytes JSX → 166567 bytes JS into app.compiled.js
 ```
 
-> ⚠️ **Always run `npm run build` after editing `app.js`** — the browser loads `app.compiled.js`, not `app.js` directly.
+### Watch mode (auto-rebuilds on every save)
+```bash
+npm run build:watch
+```
+
+> ⚠️ **Always run `npm run build` after editing `app.js`** — the browser loads `app.compiled.js`, not `app.js` directly. `npm run dev` handles this automatically in the background.
 
 ### Why not use `<script type="text/babel">`?
 
-Loading remote Babel transpilation in a `file://` context is blocked by browser CORS policies. The pre-compile approach works without a dev server and keeps page load fast.
+Loading remote Babel transpilation in a `file://` context is blocked by browser CORS policies. Pre-compiling works without a dev server and keeps page load fast.
 
 ---
 
 ## 🔒 Environment Variables
 
-File: `backend/.env`
+File: `backend/.env` — copy from `backend/.env.example`. **Never committed to git.**
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `PORT` | `5000` | Port the Express API listens on |
-| `CORS_ORIGIN` | `*` | Allowed CORS origins (restrict in production) |
-| `DB_PATH` | `./hostel.db` | Path to the SQLite database file |
+| `CORS_ORIGIN` | `*` | Allowed CORS origins — restrict to your domain in production |
+| `DB_PATH` | `./hostel.db` | SQLite database path (relative to `backend/`) |
 
 ---
 
@@ -379,15 +386,17 @@ React State ←──── localStorage ←──── Saved on every state ch
               Express API
                    │
               SQLite (hostel.db)
+                   │
+              PRAGMA foreign_keys = ON  ← referential integrity enforced
 ```
 
 1. **localStorage** — instant saves, works offline, survives page refresh
 2. **SQLite via API** — durable server-side storage, synced on app mount
-3. **Graceful fallback** — if backend is unreachable, API errors are silently caught and the app continues with localStorage data
+3. **Graceful fallback** — if backend is unreachable, errors are caught silently and the app continues with localStorage data
 
-### Reset all data to defaults
+### Reset frontend data to defaults
 
-Run this in the browser DevTools console:
+Run in browser DevTools console:
 ```js
 Object.keys(localStorage)
   .filter(k => k.startsWith('stayease_'))
@@ -395,12 +404,18 @@ Object.keys(localStorage)
 location.reload();
 ```
 
+### Reset database to defaults
+
+Delete `backend/hostel.db` and restart the backend — it re-seeds fresh demo data automatically on next launch.
+
 ---
 
 ## 🎨 Customization Guide
 
 ### Change Default Hostel Details
-Edit `INITIAL_HOSTEL` in `app.js` (~line 187), then rebuild:
+
+The quickest way is the **Admin Settings tab** in the UI (no code required). For code-level defaults, edit `INITIAL_HOSTEL` in `app.js`, then rebuild:
+
 ```js
 const INITIAL_HOSTEL = {
   name: 'Your Hostel Name',
@@ -416,7 +431,8 @@ const INITIAL_HOSTEL = {
 ```
 
 ### Add a New Preset Template
-Extend `HOSTEL_TEMPLATES` in `app.js` (~line 207):
+
+Extend `HOSTEL_TEMPLATES` in `app.js`:
 ```js
 const HOSTEL_TEMPLATES = {
   // ...existing presets...
@@ -429,6 +445,7 @@ const HOSTEL_TEMPLATES = {
 ```
 
 ### Change Brand Colors
+
 Edit the Tailwind config inside `index.html`:
 ```js
 tailwind.config = {
@@ -446,6 +463,7 @@ tailwind.config = {
 ```
 
 ### Add a New API Route
+
 1. Add the route handler in `backend/server.js`
 2. Add the client method to `StayEaseApi` in `api.js`
 3. Call `StayEaseApi.yourMethod()` from React components in `app.js`
@@ -457,10 +475,11 @@ tailwind.config = {
 
 ```bash
 # From project root:
-npm run build     # Compile app.js → app.compiled.js  ← run after every app.js edit
-npm run dev       # Start backend with nodemon (hot reload on changes)
-npm start         # Start backend in production mode
-npm test          # Run backend API integration tests (backend/test-api.js)
+npm run dev          # Start backend (nodemon) + auto-rebuild frontend on app.js changes
+npm run build        # Compile app.js → app.compiled.js (one-shot)
+npm run build:watch  # Compile app.js → app.compiled.js (watch mode)
+npm start            # Start backend in production mode (no nodemon)
+npm test             # Run backend API integration tests (backend/test-api.js)
 ```
 
 ---
@@ -470,15 +489,17 @@ npm test          # Run backend API integration tests (backend/test-api.js)
 | File | Purpose |
 |------|---------|
 | `app.js` | All React UI — **edit this to change the frontend** |
-| `app.compiled.js` | Browser-ready JS — **auto-generated, don't edit manually** |
-| `index.html` | App shell, Tailwind config, CDN script tags |
 | `api.js` | `StayEaseApi` client — bridges frontend ↔ backend |
-| `compile.js` | Babel build script |
+| `index.html` | App shell, Tailwind config, CDN script tags |
+| `scripts/build.js` | Babel build script (JSX → plain JS) |
+| `scripts/dev.js` | Dev runner (backend + build watcher) |
+| `babel.config.json` | Babel preset configuration |
 | `backend/server.js` | All REST API route handlers |
 | `backend/database.js` | SQLite schema, seed data, async query helpers |
-| `backend/hostel.db` | SQLite database (auto-created on first `npm run dev`) |
-| `backend/.env` | Environment configuration |
+| `backend/.env.example` | Environment variable template |
 | `backend/test-api.js` | Full API integration test suite |
+
+> `app.compiled.js` and `backend/hostel.db` are generated at runtime and are **not tracked in git**.
 
 ---
 
